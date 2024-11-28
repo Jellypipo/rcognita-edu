@@ -271,7 +271,116 @@ class Sys3WRobotNI(System):
     
     def _state_dyn(self, t, state, action, disturb=[]):   
         Dstate = np.zeros(self.dim_state)
+            
+        """
+        Computes the state dynamics for a 3-wheel robot with non-holonomic constraints.
         
+        Parameters:
+            t : float
+                Current time (not used in this model but can be useful for time-dependent control).
+            state : ndarray
+                Current state vector of the robot [x, y, theta].
+            action : ndarray
+                Control inputs [v, omega], where v is the linear velocity and omega is the angular velocity.
+            disturb : list
+                Disturbances affecting the state dynamics, if any.
+                
+        Returns:
+            Dstate : ndarray
+                Time derivatives of the state vector [dx, dy, dtheta].
+        """
+        # Extract state variables
+        x, y, theta = state
+        
+        # Extract action inputs
+        v = action[0]   # Linear velocity
+        omega = action[1]  # Angular velocity
+        
+        # Initialize the derivative of the state
+        Dstate = np.zeros(self.dim_state)
+        
+        # Compute the state derivatives based on the kinematic model of the robot
+        Dstate[0] = v * np.cos(theta)   # dx/dt
+        Dstate[1] = v * np.sin(theta)   # dy/dt
+        Dstate[2] = omega               # dtheta/dt
+        
+        # Apply disturbances if present
+        if disturb:
+            Dstate += disturb
+    
+
+        #####################################################################################################
+        ############################# write down here math model of robot ###################################
+        #####################################################################################################    
+             
+        return Dstate    
+ 
+    def _disturb_dyn(self, t, disturb):
+        """
+        
+        
+        """       
+        Ddisturb = np.zeros(self.dim_disturb)
+        
+        for k in range(0, self.dim_disturb):
+            Ddisturb[k] = - self.tau_disturb[k] * ( disturb[k] + self.sigma_disturb[k] * (randn() + self.mu_disturb[k]) )
+                
+        return Ddisturb   
+    
+    def out(self, state, action=[]):
+        observation = np.zeros(self.dim_output)
+        observation = state
+        return observation
+
+
+class SysCarLikeRobot(System):
+    """
+    System class: 3-wheel robot with static actuators (the NI - non-holonomic integrator).
+    
+    
+    """ 
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.name = '3wrobotNI'
+        
+        if self.is_disturb:
+            self.sigma_disturb = self.pars_disturb[0]
+            self.mu_disturb = self.pars_disturb[1]
+            self.tau_disturb = self.pars_disturb[2]
+    
+    def _state_dyn(self, t, state, action, disturb=[]):   
+        Dstate = np.zeros(self.dim_state)
+            
+        """
+        Computes the state dynamics for a 3-wheel robot with non-holonomic constraints.
+        
+        Parameters:
+            t : float
+                Current time (not used in this model but can be useful for time-dependent control).
+            state : ndarray
+                Current state vector of the robot [x, y, theta].
+            action : ndarray
+                Control inputs [v, omega], where v is the linear velocity and omega is the angular velocity.
+            disturb : list
+                Disturbances affecting the state dynamics, if any.
+                
+        Returns:
+            Dstate : ndarray
+                Time derivatives of the state vector [dx, dy, dtheta].
+        """
+     
+        # Initialize the derivative of the state
+        Dstate = np.zeros(self.dim_state)
+        wheelbase = 1
+        
+        # Compute the state derivatives based on the kinematic model of the robot
+        Dstate[0] = action[0] * np.cos(state[2])  # dx/dt
+        Dstate[1] = action[0] * np.sin(state[2])   # dy/dt
+        Dstate[2] = (action[0] * np.tan(action[1]))/wheelbase             # dtheta/dt
+        
+       
 
         #####################################################################################################
         ############################# write down here math model of robot ###################################

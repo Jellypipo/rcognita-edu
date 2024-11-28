@@ -550,12 +550,119 @@ class ControllerOptimalPredictive:
             return self.action_curr
 
 class N_CTRL:
+    def __init__(self, params=None):
+        """
+        Initialize the N_CTRL class with optional parameters.
+        params: dictionary containing controller parameters
+        """
+        # Store parameters, use default values if not provided
+        self.params = params if params is not None else {
+            'linear_gain': 1.0,
+            'angular_gain': 1.0,
+            'target_position': [0.0, 0.0],
+        }
+        self.v = 0  # Linear velocity
+        self.w = 0  # Angular velocity
+
+    def pure_loop(self, observation):
+        """
+        Compute control action based on the current observation.
+        
+        observation: array-like structure representing the current state or observation
+        """
+        # For illustration, assume observation includes [current_x, current_y, current_orientation]
+        current_x, current_y, current_orientation = observation
+        
+        # Unpack parameters for readability
+        target_x, target_y = self.params['target_position']
+        linear_gain = self.params['linear_gain']
+        angular_gain = self.params['angular_gain']
+
+        # Compute distance to target and required orientation
+        dx = target_x - current_x
+        dy = target_y - current_y
+        target_orientation = math.atan2(dy, dx)
+
+        # Compute control signals based on errors
+        distance_error = math.sqrt(dx**2 + dy**2)
+        orientation_error = target_orientation - current_orientation
+
+        # Linear velocity (v) is proportional to the distance to the target
+        self.v = linear_gain * distance_error
+        
+        # Angular velocity (w) is proportional to the orientation error
+        self.w = angular_gain * orientation_error
+
+        # Optionally clamp the values for safety
+        self.v = np.clip(self.v, -1.0, 1.0)  # Limit linear velocity
+        self.w = np.clip(self.w, -1.0, 1.0)  # Limit angular velocity
+
+        # Return computed actions as a list
+        return [self.v, self.w]
+
 
         #####################################################################################################
         ########################## write down here nominal controller class #################################
         #####################################################################################################
+class StanleyController:
+    def __init__(self, params=None):
+        """
+        Initialize the StanleyController class with optional parameters.
+        params: dictionary containing controller parameters
+        """
+        # Store parameters, use default values if not provided
+        self.params = params if params is not None else {
+            'linear_gain': 1.0,
+            'angular_gain': 1.0,
+            'target_position': [0.0, 0.0],
+        }
+        self.v = 0.22  # Linear velocity
+        self.w = 0  # Angular velocity
+        self.wheelbase = 1 
+    def traj_gen():
+        circle_radius = 2
+        circle_center = [0,0] 
+        num_of_wp = 5
+        f = 0.5
+        
+        theta_ref = np.linspace(0, 2 * np.pi, num_of_wp)
+        x_ref = np.linspace(0, 5, 200)
+        y_ref = circle_radius * np.sin(2 * np.pi * x_ref * f)
+        theta1 = np.arctan(np.gradient(y_ref), np.gradient(x_ref))
+        # x_ref = x_ref + wheelbase * np.cos(theta_ref) 
+        trajectory = np.vstack(x_ref, y_ref, theta_ref)
+        return trajectory
 
-        return [v,w]
+    def pure_loop(self, observation):
+        """
+        Compute control action based on the current observation.
+        
+        observation: array-like structure representing the current state or observation
+        """
+        x_robot = observation[0]
+        y_robot = observation[1]
+        theta_robot = observation[2]
+        linear_velocity = self.linear_velocity
+        x_front = x_robot + self.wheelbase * np.cos(theta_robot)
+        y_front = y_robot + self.wheelbase * np.cos(theta_robot)
+        
+        trajectory = self.traj_gen()
+        #print(trajectory)
+        dx = trajectory[:,0]-x_front
+        dy = trajectory[:,1]-y_front
+        distances = np.sqrt((dx**2)+(dy**2))
+        nearest_index = np.argmin(distances)
+        nearest_point = trajectory[nearest_index]
+        #compute heading error
+        ex = nearest_point[0]-x_front
+        ey = nearest_point[1]-y_front
+        psi = -theta_robot + np.arctan2(ey,ex)
+        cross_track_error = (ey) * np.cos(theta_robot) - ex * np.sin(theta_robot)
+        k = 0.5
+        delta = psi + np.arctan2(k*cross_track_error,linear_velocity)
+        print(observation)
+        return [self.v, delta]
+
 
 
 
